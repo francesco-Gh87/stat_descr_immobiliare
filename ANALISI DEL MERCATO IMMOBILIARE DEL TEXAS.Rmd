@@ -1,0 +1,1015 @@
+---
+---
+---
+
+```{r}
+#options(repos = c(CRAN = "https://cran.stanford.edu/"))
+```
+
+```{r setup, include=FALSE}
+#knitr::opts_chunk$set(warning = FALSE)
+```
+
+## FUNZIONI UTILI
+
+```{r}
+install.packages('plotly')
+install.packages('patchwork')
+install.packages("psych")
+install.packages('corrplot')
+install.packages('dplyr')
+
+
+gini.index<- function(data){
+  ni=table(data)
+  fi=ni/length(data)
+  fi2=fi^2
+  J= length(table(data))
+  gini= 1-sum(fi2)
+  gini.normalizzato = gini/((J-1)/J)
+  return(gini.normalizzato)
+}
+
+fisher_index<-function(data){
+  mu<-mean(data)
+  sigma<- sd(data)
+  n<-length(data)
+  m3<-sum((data-mu)^3)/n
+  fisher<-m3/sigma^3
+  return(fisher)
+}
+
+curtosi_index<-function(data){
+  mu<-mean(data)
+  sigma<- sd(data)
+  n<-length(data)
+  m4<-sum((data-mu)^4)/n
+  curtosi<-m4/sigma^4-3
+}
+CV<- function(data){
+  return(sd(data)/mean(data)*100)
+}
+```
+
+## IMPORTAZIONE DEL DATASET
+
+```{r}
+
+library(psych)
+#caricamento del dateset
+dati<- read.csv('RealEstateTexas.csv', sep= ',')
+#controllo delle prime 15 osservazioni
+head(dati, 15)
+#controllo dimensioni del dataset
+dim(dati)
+#salvataggio del numero totale di osservazioni
+N<-dim(dati)[1]
+```
+
+## CARATTERISTICHE DELLE VARIABILI
+
+Il dataset é composto da 240 osservazioni che registrano i dati di 8 variabili differenti.
+
+le variabili sono le seguenti:
+
+1.  **CITY**: città. Variabile **qualitativa nominale**.
+
+2.  **YEAR**: anno di riferimento. Variabile **quantitativa continua** da trattare come **qualitativa** **ordinale** in questo caso.
+
+3.  **MONTH**: mese di riferimento. Variabile **Qualitativa nominale (ciclica)** ma codificata in numeri.
+
+4.  **SALES**: numero totale di vendite. Variabile **quantitativa discreta**.
+
+5.  **VOLUME**: valore totale delle vendite in milioni di dollari. Variabile **quantitativa continua**.
+
+6.  **MEDIAN_PRICE**: prezzo mediano di vendita in dollari. Variabile **quantitativa continua**.
+
+7.  **LISTINGS**: numero totale di annunci attivi months_inventory. Variabile **quantitativa discreta**.
+
+8.  **MONTH_INVENTORY**: quantità di tempo necessaria per vendere tutte le inserzioni correnti al ritmo attuale delle vendite, espresso in mesi. Variabile **quantitativa continua**.
+
+Le variabile QUANTITATIVE CONTINUE sono **tutte su scala di rapporti.**
+
+## CALCOLO DEGLI INDICI DI POSIZIONE E DI FORMA DELLE VARIABILI
+
+Andiamo a prendere ogni singola variabile e calcoliamo gli indici di posizione, variabilitá e forma.
+
+### Variabile city
+
+La variabile city é una variabile QUALITATIVA NOMINALE per tanto ha senso andare a calcolare: le frequenze, da cui otterremo la moda e successivamente plotteremo i dati.
+
+#### Calcolo della moda.
+
+```{r}
+library(ggplot2)
+attach(dati)
+table(city) #calcoliamo le frequenze della variabile city
+ggplot(data = dati)+
+  geom_bar(aes(x=city),
+           stat='count',
+           col='black',
+           fill='lightblue'
+           )+
+  labs(title = 'Distribuzione Delle Cittá',
+       x='CITTÁ',
+       y='Frequenza assolute')
+  
+```
+
+Come possiamo vedere dal grafico, la distribuzione di frequenza delle cittá é **QUADRIMODALE**. Con un valore di 60. Osservando la distribuzione di frequenza possiamo notare che la variabile é **EQUAMENTE DISTRIBUITA**. pertanto avrá **INDICE DI GINI PARI A ZERO**. Non ho effettuato il calcolo delle cumulate molto semplicemente perché tutti i valori hanno la medesima frequenza quindi sarebbe un calcolo rindondante e privo di informazioni aggiuntive.
+
+### Variabile Year
+
+La variabile Year pur essendo una variabile QUANTITATIVA CONTINUA, in questo contesto possiamo trattarla come una variabile QUALITATIVA ORDINALE non avendo molto senso calcolare la media degli anni in questo contesto, pertanto calcoleremo: le frequenze per ottenere successivamente moda e mediana.
+
+#### Calcolo della moda.
+
+```{r}
+table(year) #calcolo delle frequenze assolute per la variabile year
+moda_year = max(table(year)) #identifico il valore massimo delle frequenze assolute
+
+ggplot(data=dati)+
+  geom_bar(aes(x=year),
+           stat='count',
+           fill='lightblue',
+           col= 'black'
+           )+
+  labs(title = 'Distribuzione di frequenze assolute ANNI',
+       x = 'Anni',
+       y = 'Frequenze assolute'
+  )+
+  geom_hline(yintercept = moda_year, col='red')+
+  geom_label(aes(x= year,
+                 y= moda_year,
+             label= moda_year),
+col='red')
+  
+summary(year)
+
+```
+
+In questo contesto come per la variabille CITY siamo davanti a una distribuzione QUADRIMODALE il cui valore é 48.
+
+### Variabile Month
+
+La variabile month é una variabile QUALITATIVA DI TIPO NOMINALE (ciclica), i numeri equivalgono ai mesi in successione Gennaio Febbraio ecc ecc... Per tanto andremo a calcolare la frequenza di ogni mese.
+
+#### Moda
+
+```{r}
+table(month) #calcolo delle frequenze assolute per la variabile year
+moda_month = max(table(month)) #identifico il valore conl a frequenza massima
+
+ggplot(data=dati)+
+  geom_bar(aes(x=month),
+           stat='count',
+           fill='lightblue',
+           col= 'black'
+           )+
+  scale_x_continuous(breaks = seq(1,12,1)
+  )+
+  labs(title = 'Distribuzione di frequenze assolute MESI',
+       x = 'Mesi',
+       y = 'Frequenze assolute'
+  )+
+  geom_hline(yintercept = moda_month, col='red')+
+  geom_label(aes(x= month,
+                 y= moda_month,
+             label= moda_month),
+col='red')
+```
+
+Del seguente grafico possiamo vedere che la variabile month "come la variabile anni", presenta una distribuzione QUADRIMODALE, ne possiamo dedurre che nel database non vi siano "buchi" di mesi ne "buchi" negli anni. Le osservazioni raccolte sono complete.
+
+### Variabile Sales.
+
+La variabile quantitativa sales é una variabile QUANTITATIVA DISCRETA per tanto possiamo andare a calcolare: Media, Moda, mediana, Range, Varianza, Deviazione standard, IQR, e Coefficente di Variazione.
+
+#### Mediana
+
+```{r}
+#calcoliamo la metá del numero di osservazioni
+N/2
+#notiamo che la metá é pari bisogna prendere il valore a metá tra 120 e 121 della serie ordinata di sales
+sort(sales)[c(120,121)]
+#trovati i valori ne facciamo la media
+median_sales<-(175+176)/2
+#controlliamo che il calcolo sia corretto con la funzione di default di R
+median(sales)
+
+```
+
+#### Media
+
+```{r}
+#calcoliamo la somma di tutti i valori e dividiamo il numero di valori, usiamo la media aritmetica
+mu_sales<-sum(sales)/N
+
+#verifichiamo che il calcolo sia corretto con la funzione di R
+mean(sales)
+```
+
+#### Divisione in classi , tabella frequenza, e grafico frequenze relative cumulate
+
+Raggruppiamo in classi per avere una visualizzazione migliore della distribuzione e per visualizzare la classe modale.
+
+```{r}
+#decido di dividere in classi di 43 valori per classe 
+lunghezza_class_sales<- cut(sales,
+                            breaks= seq(79,423,43), right= F, include.lowest = T)
+ni=table(lunghezza_class_sales)
+fi= table(lunghezza_class_sales)/sum(table(lunghezza_class_sales))*100
+NI=cumsum(table(lunghezza_class_sales))
+FI= cumsum(table(lunghezza_class_sales)/sum(table(lunghezza_class_sales))*100)
+
+tabella_frequenze<- as.data.frame((cbind(ni, fi, NI, FI)))
+
+ggplot(data = dati)+
+  geom_bar(aes(x = lunghezza_class_sales), 
+               fill= 'blue',
+           stat='count',
+           col= 'black',
+           )+
+  labs(title= 'Frequenze assolute sales',
+     x= "CLASSI SALES",
+     y= "Frequenze assolute")+
+  geom_vline(xintercept=2,  
+             col='red',      
+             size=0.5)+
+  
+annotate("text", x = 2.05, y = 63, label = 'classe modale', col = 'red')
+```
+
+Ora visualizzziamo la classe mediana che sappiamo essere la classe entro cui cadono il 50% dei nostri dati.
+
+```{r}
+ggplot(data = dati)+
+  geom_bar(aes(x = lunghezza_class_sales, 
+               y= stat(cumsum(count)/sum(count))), 
+               fill= 'blue',
+           stat='count',
+           col= 'black',
+           )+
+  
+  geom_vline(xintercept=3,  
+             col='red',      
+             size=0.5)+
+  
+annotate("text", x = 3.10, y = 0.85, label = 'classe mediana', col = 'red')+
+  
+
+labs(title = "Distribuzione di frequenze relative cumulate di Sales",
+     x= 'CLASSI SALES',
+     y= 'frequenze relative cumulate')
+```
+
+#### Varianza e Deviazione standard
+
+Ci permetterano di fare un confronto successivo in merito alla distribuzioni dei nostri dati quando lo faremo tuttavia vista la grossa differenza tra unitá di misura delle variabile ci conviene prendere in considerazione il CV e non direttamente la devizione standard, grazie a questo confronto potremmo capire quale delle nostre variabili ha una variabilitá maggiore o minore dei dati.
+
+```{r}
+sigma2_sales= sum((sales-mu_sales)^2)/N
+sigma_sales= sqrt(sigma2_sales)
+
+var(sales)
+sd(sales)
+describe(sales)
+```
+
+#### IQR Range
+
+```{r}
+range(sales)
+IQR(sales)
+summary(sales)
+```
+
+Questi numeri stanno a significare che la variabile sales ha un range totale di valori registrati che vanno da 79 a 423. Il 50% dei nostri dati si trova compreso tra il primo quartile 127.0 e il terzo quartile 247.0
+
+Ma vediamo questi dati in un boxplot per capire meglio cosa vogliono dire.
+
+```{r}
+quantili<-quantile(sales)
+mean_sales <- mean(sales)
+median_sales <- median(sales)
+minimo= min(sales)
+massimo= max(sales)
+primo_quartile=as.numeric(quantili[2])
+primo_quartile
+terzo_quartile=as.numeric(quantili[4])
+
+ggplot(data=dati) +
+  geom_boxplot(aes(x=sales),
+               col='black',
+               fill="lightblue") +
+  geom_vline(xintercept=mean_sales,  
+             col='red',      
+             size=0.5) +
+  geom_vline(xintercept=median_sales,
+             col='green',
+             size=0.5) +
+  geom_vline(xintercept=primo_quartile,
+             col='blue',
+             size=0.5) +
+  geom_vline(xintercept =terzo_quartile,
+             col='blue',
+             size=0.5)+
+  
+  
+  
+  geom_label(aes(y=0.5, x = terzo_quartile, label=terzo_quartile),
+
+             col='blue',fill='white', nudge_x =29 )+
+  
+  geom_label(aes(y=0.5, x = primo_quartile, label=primo_quartile),
+
+             col='blue',fill='white', nudge_x =-21.5 )+
+  
+  geom_label(aes(y = 0.5, x = mean_sales, label = round(mean_sales, 2)),
+             col='red', fill='white', nudge_x = 24.5) +
+  
+  geom_label(aes(y = 0.5, x = median_sales, label = round(median_sales, 2)),
+             col='green', fill='white', nudge_x = -22.5) +
+  
+  
+  
+  geom_point(aes(x=mean_sales, y=0.5, color='Media'), size=2) +
+  
+  geom_point(aes(x=median_sales, y=0.5, color='Mediana'), size=2) +
+  
+  geom_point(aes(x=primo_quartile, y=0.5, color="Primo quartile"), size=2) +
+  
+  geom_point(aes(x=terzo_quartile, y=0.5, color='Terzo quartile'), size=2) +
+  
+  labs(title = 'Boxplot distribuzione variabile Sales',
+       x='SALES',
+       y= 'Y')+
+  
+  
+  scale_color_manual(name = "Statistiche", 
+                     values = c("Media" = "red", "Mediana" = "green", 'Primo quartile' ='blue', 'Terzo quartile'= 'blue'))
+
+
+ describe(sales)
+
+```
+
+Da questo grafico possiamo capire che la mediana e la moda non coincidono, di consequenza avremmo un'assimetria positiva questo é confermato dall'indice di asimettria di 0.71. Quindi abbiamo code piú lunghe verso destra.
+
+#### Cv
+
+```{r}
+cv_sales<-CV(sales)
+cv_sales
+```
+
+Questo valore ci permetterá successivamente di confrontare le diverse variabili per capire quale ha la variabilitá piú grande senza preoccuparci delle unitá misura o di linee di grandezza differenti
+
+#### Fisher Index
+
+```{r}
+fisher_sales<- fisher_index(sales)
+fisher_sales
+```
+
+#### Curtosi
+
+```{r}
+curtosi_sales <- curtosi_index(sales)
+curtosi_sales
+```
+
+### Variabile Volume.
+
+La variabile volume é una variabile QUANTITATIVA CONTINUA, vista la tipologia di variabile possiamo andare ad osservare la sua distribuzione di densitá per avere un'idea della distribuzione. Successivamente andremo a calcolare: mediana, media, varianza, deviazione standard, IQR, CV.
+
+```{r}
+attach(dati)
+ggplot(data=dati)+
+  geom_density(aes(x=volume), col='black', fill='green')+
+labs(title='Distribuzione di densitá Volume soldi',
+     x = 'Vendite in milioni di dollari',
+     y = 'densitá di probabilitá' )
+
+
+```
+
+Da questo primo plottaggio notiamo che la distribuzione delle vendite intesa in milioni di dollari ha un andamento simile a quella delle vendite notiamo una concentrazione dei valori nella prima parte del grafico e una coda piú lunga verso destra.
+
+#### Mediana
+
+```{r}
+N/2
+sort(volume)[c(120,121)]
+median_volume<-(26.961+27.164)/2
+median_volume
+```
+
+#### Media
+
+```{r}
+mean_volume<-sum(volume)/N
+mean_volume
+```
+
+#### IQR
+
+```{r}
+quantili_volume<-quantile(volume)
+primo_quartile_volume=as.numeric(quantili_volume[2])
+terzo_quartile_volume=as.numeric(quantili_volume[4])
+quantili_volume
+primo_quartile_volume
+terzo_quartile_volume
+```
+
+#### CV
+
+```{r}
+cv_volume<-CV(volume)
+cv_volume
+```
+
+Possiamo notare come la dispersione intorno alla media del volume sia maggiore rispetto alla dispersione intorno alla media delle vendite, di conseguenza possiamo dire che la variabile volume abbia una variabilitiá maggiore rispetto a sales.
+
+#### Fisher index
+
+```{r}
+fisher_volume<- fisher_index(volume)
+fisher_volume
+```
+
+#### Curtosi
+
+```{r}
+curtosi_volume<- curtosi_index(volume)
+curtosi_volume
+```
+
+### Variabile Median price
+
+La variabile Median Price é una variabile QUANTITATIVO CONTINUA.
+
+```{r}
+ggplot(data=dati)+
+  geom_density(aes(x=median_price), col='black', fill='purple')+
+  labs(title='Distribuzione di densitá Median Price',
+       x='Prezzo mediano',
+       y='Densitá di probabilitá')
+```
+
+#### Mediana
+
+```{r}
+N/2
+sort(median_price)[c(120,121)]
+median_median_price<-(134500+134500)/2
+median_median_price
+```
+
+#### Media
+
+```{r}
+mean_median_price<-sum(median_price)/N
+mean_median_price
+```
+
+#### IQR
+
+```{r}
+quantili_median_price<-quantile(median_price)
+primo_quartile_median_price=as.numeric(quantili_median_price[2])
+terzo_quartile_median_price=as.numeric(quantili_median_price[4])
+quantili_median_price
+primo_quartile_median_price
+terzo_quartile_median_price
+```
+
+#### CV
+
+```{r}
+cv_median_price<-CV(median_price)
+cv_median_price
+```
+
+#### Fisher index
+
+```{r}
+fisher_median_price<-fisher_index(median_price)
+fisher_median_price
+```
+
+#### Curtosi index
+
+```{r}
+curtosi_median_price<-curtosi_index(median_price)
+curtosi_median_price
+```
+
+### Variabile listings
+
+La variabile Listings é una variabile QUANTITATIVA DISCRETA.
+
+```{r}
+summary(listings)
+3296-743
+2553/69
+```
+
+```{r}
+lunghezza_class_listings<- cut(listings,
+                            breaks= seq(743,3296,69), right= F, include.lowest = T)
+
+ni=table(lunghezza_class_listings)
+fi= table(lunghezza_class_listings)/sum(table(lunghezza_class_listings))
+NI=cumsum(table(lunghezza_class_listings))
+FI= cumsum(table(lunghezza_class_listings)/sum(table(lunghezza_class_listings)))
+classi<-levels(lunghezza_class_listings)
+  
+tabella_frequenze_listings<- data.frame(classi=classi,
+                                        ni= as.numeric(ni), 
+                                        fi= as.numeric(fi), 
+                                        NI=as.numeric(NI), 
+                                        FI=as.numeric(FI))
+
+tabella_frequenze_listings$classi <- factor(tabella_frequenze_listings$classi, levels = classi, ordered = TRUE)
+
+ggplot(data=tabella_frequenze_listings )+
+  geom_col(aes(x=classi, y=ni),
+           col='black',
+           fill='lightblue')+
+  
+labs(title= 'distribuzione Frequenza assoluta listings',
+     x= 'Listings',
+     y= 'frequenza assoluta')+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+#### Mediana
+
+```{r}
+N/2
+sort(listings)[c(120,121)]
+median_listings<-(1617+1620)/2
+median_listings
+```
+
+#### Media
+
+```{r}
+mean_listings<-sum(listings)/N
+mean_listings
+```
+
+#### IQR Range
+
+```{r}
+quantili_listings<-quantile(listings)
+primo_quartile_listings=as.numeric(quantili_listings[2])
+terzo_quartile_listings=as.numeric(quantili_listings[4])
+quantili_listings
+primo_quartile_listings
+terzo_quartile_listings
+```
+
+#### CV
+
+```{r}
+cv_listings<-CV(listings)
+cv_listings
+```
+
+#### Fisher index
+
+```{r}
+fisher_listings<-fisher_index(listings)
+fisher_listings
+```
+
+#### Curtosi index
+
+```{r}
+curtosi_listings<-curtosi_index(listings)
+curtosi_listings
+```
+
+### Month inventory
+
+La variabile Month Inventory é una variabile QUANTITATIVA CONTINUA.
+
+```{r}
+ggplot(data=dati)+
+  geom_density(aes(x=months_inventory), col='black', fill='pink')+
+labs(title='Distribuzione di densitá months inventory',
+     x = 'months inventory',
+     y = 'densitá di probabilitá')
+```
+
+#### Mediana
+
+```{r}
+sort(months_inventory)[c(120,121)]
+median_months_inventory<-(8.9+9.0)/2
+median_months_inventory
+```
+
+#### Media
+
+```{r}
+mean_months_inventory<-sum(months_inventory)/N
+mean_months_inventory
+```
+
+#### IQR Range
+
+```{r}
+quantili_months_inventory<-quantile(months_inventory)
+primo_quartile_months_inventory=as.numeric(quantili_months_inventory[2])
+terzo_quartile_months_inventory=as.numeric(quantili_months_inventory[4])
+quantili_months_inventory
+primo_quartile_months_inventory
+terzo_quartile_months_inventory
+```
+
+#### CV
+
+```{r}
+cv_months_inventory<-CV(months_inventory)
+cv_months_inventory
+```
+
+#### Fisher index
+
+```{r}
+fisher_months_inventory<-fisher_index(months_inventory)
+fisher_months_inventory
+```
+
+#### Curtosi index
+
+```{r}
+curtosi_months_inventory<-curtosi_index(months_inventory)
+curtosi_months_inventory
+```
+
+Possiamo affermare che la variabile volume risulta essere quella piú variabile e quella piú assimetrica. L'ho dedotto confrontando i diversi CV. Analizzando la variabilitá intorno alla media e gli indici di Fisher per quanto riguarda l'asimmetria in questo caso positiva, possiamo dedurre che avremmo una concentrazione di dati maggiore nella parte sinistra della curva.
+
+## PROBABILITÁ.
+
+la probabilita di estrarre una riga con i vaori indicati sará pari al numero di casi favorevoli diviso il numerodi casi totali che in questo caso coincidono con il numero di tutte le righe del dataset, i valori di probabilitá calcolati sono espressi in precentuale, per tanto:
+
+```{r}
+#probabilitá che una riga riporti la cittá di beamount:
+probabilitá_beamount<-(48/N)*100
+probabilitá_beamount
+```
+
+```{r}
+#probabilitá che una riga riporti il mese di Luglio
+probabilitá_Luglio<-(20/N)*100
+probabilitá_Luglio
+```
+
+```{r}
+#probabilitá che una riga riporti il mese di Dicembre 2012
+probabilitá_12_2012<- (4/N)*100
+probabilitá_12_2012
+```
+
+## CREAZIONE COLONNA PREZZO MEDIO
+
+```{r}
+dati$mean_price<-numeric(nrow(dati))
+for (i in 1:nrow(dati)){
+  dati$mean_price[i]<-dati$volume[i]/dati$sale[i]*100
+}
+```
+
+## CREAZIONE COLONNA INDICE DI CONVERSIONE
+
+Mettendo in relazione il numero delle vendite con gli annunci del mercato possiamo avere un indice che ci permette di capire quanto la conversione degli annunci in vendite effettiva sia efficace. Per farlo possiamo aggiungere una colonna al dataset.
+
+Piú questo valore in percentuale é alto piú i nostri annunci si sono trasformati in vendite.
+
+```{r}
+dati$conversion_rate<-numeric(nrow(dati))
+dati$conversion_rate <- round((dati$sales / dati$listings) * 100, 0)
+```
+
+## MATRICE DI CORRELAZIONE
+
+```{r}
+library(corrplot)
+cor_matrix <- cor(dati[, c("conversion_rate", "listings", "sales", "volume", "months_inventory", "median_price",'mean_price')])
+corrplot(cor_matrix,col = colorRampPalette(c("blue", "lightblue", "white"))(10), method='color', addCoef.col = 'black',number.cex = 0.7,tl.cex = 0.6, tl.col = "black", cl.cex = 0.6)
+```
+
+Grazie alla matrice di correlazione possiamo fare alcune considerazioni interessanti in merito al conversion rate:
+
+1.  Come potevamo immaginare si osserva una correlazione media positiva tra il volume totale di soldi e le vendite.
+
+2.  Il conversion rate é inverso al month_inventory, nel senso che a un aumento del conversion rate corrisponde una diminuzione del month inventory in sostanza piú l'indice di conversione aumenta piú il mercato si svuota.
+
+3.  Tra vendite, indice di conversione, annunci e month inventory posiamo notare diverse cose interressanti; piú aumentano gli annunci piú le vendite aumentano ma allo stesso tempo piú aumenta l'indice di conversione piú gi annunci diminuiscono, ma notiamo anche che all'aumentare degli annunci aumenta anche il month inventory; quindi anziché aumentare gli annunci per alzare le vendite rischiando di aumentare il month inventory che come si vede impatta negativamente sull'indice di conversione, potremmo andare a suggerire azioni di marketing piú efficenti o aggressive per vendere gli annunci giá presenti sul mercato, ottimizzare il nostro indice di conversione e, quando questo smette di crescere, solo in quel momento agire su un aumento degli annunci per risalire sulle vendite: cosí potremmo evitare eventuali saturazioni di mercato, mantenendo una certa costanza. Tenere monitorato l'indice di vendita ci permette di capire in quali zone le conversioni sono ottimali; limitando cosi gli annunci perché quelli giá presenti sul mercato sono efficaci; cosi ci riserveremo di uscire con altri annunci quando l'indice si stabilizza o sta per scendere per aumentare le vendite e tornare ad una situazione ottimale per aumentare vendite e volume di soldi.
+
+4.  Il mercato **ad una prima occhiata** sembra abbastanza stabile alla variazione del prezzo: vediamo che l'aumento del prezzo medio non va ad influire negativamente su vendite o indice di conversione.
+
+## SUMMARY
+
+Raggruppamento per città: media delle vendite del volume e del prezzo mediano
+
+```{r}
+library(dplyr)
+dati %>%
+group_by(city) %>%
+summarise(mean_sales=mean(sales),
+mean_volume=mean(volume),
+median_price=mean(median_price))
+```
+
+```{r}
+dati %>%
+group_by(city,year) %>%
+summarise(
+mean_median_price=mean(median_price),
+cv_median_price=CV(median_price))
+
+```
+
+Da una prima occhiata possiamo notare come la cittá Bryant Collage Station sia, in termini di vendite e in termini di volume totale di soldi, il mercato piú variabile se pur registrando un prezzo mediano meno variabile rispetto alle altre cittá soprattutto se confrontato con la cittá di Wichita Falls.
+
+## BOXPLOT PREZZO MEDIANO CASE E VENDITE
+
+```{r}
+ggplot(data=dati) +
+  geom_boxplot(aes(x=city, y=median_price),
+               col='black',
+               fill="lightblue")+
+  labs(title= 'confronto prezzo mediano delle diverse cittá',
+         x= 'cittá',
+         y= 'prezzo mediano')
+```
+
+Possiamo notare che il valore piú alto del prezzo mediano sia quello della cittá di Bryan-Collage Station.
+
+```{r}
+dati_aggregati_citta <- dati %>%
+  group_by(year, city)
+
+box_plot_confronto_sales<-ggplot(data = dati_aggregati_citta, aes(x=factor(year), y=volume, fill=city)) +
+  geom_boxplot(aes(x= factor(year), 
+                   y= sales, 
+                   fill = city))
+
+box_plot_confronto_sales
+
+```
+
+Stesso grafico ma con plotly per visualizzare tutti gli indici di distribuzione e la mediana direttamente sul grafico.
+
+```{r}
+library(plotly)
+interactive_boxplot_sales<- plot_ly(data= dati, x= ~factor(year), y=~sales, color=~city, type='box', opacity= 1.5)%>%
+  layout(
+    title= "Distribuzione Totale delle Vendite per Anno e Cittá",
+    xaxis= list(title= 'Anno'),
+    yaxis= list(title= 'Vendite'),
+    boxmode= 'group'
+  )
+interactive_boxplot_sales
+```
+
+Possiamo notare come Bryant Collage in termini di vendite sia il mercato píu variabile. Il valore mediano delle vendite tende a crescere in tutti i mercati ad eccezione di wichita Falls. Apparantemente il mercato piú promettente sembra il mercato della cittá di Tyler, che registra un valore mediano di vendita notevolmente piú alto rispetto agli altri mercati incluso Bryan Collage. Possiamo oltresi notare che il valore mediano delle vendite della cittá di Beaumount si allinea se non supera il valore corrispondente a quello di Bryant_Collage, solo nell'ultimo anno il distacco tra i due aumenta considerevolmente a favore di Bryant-Collage.
+
+```{r}
+interactive_boxplot_volume<- plot_ly(data= dati, x= ~factor(year), y=~volume, color=~city, type='box', opacity= 1.5)%>%
+  layout(
+    title= "Distribuzione Totale del volume di profitti per Anno e Cittá",
+    xaxis= list(title= 'Anno'),
+    yaxis= list(title= 'milioni di dollari'),
+    boxmode= 'group'
+  )
+interactive_boxplot_volume
+```
+
+Anche per la distribuzione del volume totale dei soldi possiamo notare un andamento simile a quello giá osservato per le vendite. Notiamo un aumento della variabilitá del volume dei profitti per quanto riguarda la cittá di Bryant_Collage con una lieve contrazione nell'ultimo anno, con un valore mediano progressivamente in aumento nel corso degli anni. La cittá di Tyler mantiene una variabilitá ridotta nel corso degli anni ma il volume di profitti mediano raggiunge livelli piú alti.
+
+```{r}
+interactive_boxplot_prezzo_mediano<- plot_ly(data= dati, x= ~factor(year), y=~median_price, color=~city, type='box', opacity= 1.5)%>%
+  layout(
+    title= "Distribuzione del prezzo mediano delle case per anno e cittá",
+    xaxis= list(title= 'Anno'),
+    yaxis= list(title= 'Prezzo mediano'),
+    boxmode= 'group'
+  )
+interactive_boxplot_prezzo_mediano
+
+```
+
+Per quanto concerne il prezzo mediano delle case possiamo notare come Bryan-Collage abbia fatto registrare valori piú alti. Notiamo un trend di crescita piú significativo sia per quanto riguarda Bryan sia per Tyler; le altre due cittá non fanno registrare particolari fluttazioni nel prezzo mediano. Notiamo oltresi che per quanto riguarda la variabilitá del prezzo mediano le due cittá piú variabili in questo caso sono Beaumont e Wichita Falls.
+
+## GRAFICO A BARRE SOVRAPPOSTE
+
+```{r}
+
+ggplot(dati, aes(x= factor(month), y= sales, fill=city))+
+  
+  geom_bar(stat='identity', position= 'stack')+
+  
+  facet_wrap(~year, scales = 'free_x', ncol= 3)+
+  
+  labs(title='vendite totali per mese e cittá',x= 'mesi', y= 'vendite totali', fill= 'city')
+  
+```
+
+```{r}
+dati <- dati %>%
+  group_by(year, month) %>%
+  mutate(total_sales = sum(sales),
+         percent_sales = sales / total_sales * 100) %>%
+  ungroup()
+
+ggplot(data = dati)+
+  geom_bar(aes(x = factor(month), y= percent_sales, fill= city),
+          stat= 'identity', position= 'stack')+
+          facet_wrap(~year, scales = 'free_x', ncol= 3)+    
+          labs(title='vendite totali per mese e cittá',x= 'mesi', y= 'vendite totali', fill= 'city')
+
+```
+
+Questi due grafici ci fanno capire come nel tempo si siano evolute le vendite nelle diverse cittá; possiamo notare come il grafico normalizzato faccia emergere che il mercato dove le vendite sono inferiori sia quello di Wichita Falls. Possiamo oltresí dire che gli altri tre mercati in termini di vendite sono quelli piú interessanti in particolare Bryan e Tyler.
+
+## LINE CHART
+
+```{r}
+new_dati<- dati%>%
+  group_by(city)%>%
+  mutate(time=row_number())
+print(new_dati)
+library(ggplot2)
+
+plot_conversion_rate<-ggplot(data= new_dati, aes(x = time, y = conversion_rate, color = city)) +
+  
+  geom_line() +
+  labs(title = "Andamento dell'indice di conversione per Città",
+       x = "Mese (da 1 a 60)",
+       y = "indice di conversione",
+       color = "Città")+
+
+  scale_x_continuous(breaks = seq(1,60,1))+
+  
+  geom_vline(xintercept=12,  
+             col='blue',      
+             size=0.3) +
+  geom_vline(xintercept=24,
+             col='blue',
+             size=0.3) +
+  geom_vline(xintercept=36,
+             col='blue',
+             size=0.3) +
+  geom_vline(xintercept =48,
+             col='blue',
+             size=0.3)+
+  geom_vline(xintercept =60,
+             col='blue',
+             size=0.3)+
+  
+  annotate("text", x = 12, y = 39, label = '2010', col = 'blue') +
+  annotate("text", x = 24, y = 39, label = '2011', col = 'blue') +
+  annotate("text", x = 36, y = 39, label = '2012', col = 'blue') +
+  annotate("text", x = 48, y = 39, label = '2013', col = 'blue')+
+  annotate("text", x = 60, y = 39, label = '2014', col = 'blue')
+
+  theme(legend.text = element_text(size = 6), 
+        legend.title = element_text(size = 9))
+ 
+
+plot_volume<-ggplot(data= new_dati, aes(x = time, y = volume, color = city))+
+
+  geom_line() +
+  labs(title = "Andamento del volume di soldi in mil",
+       x = "Mese (da 1 a 60)",
+       y = "soldi in mil",
+       color = "Città")+
+
+  scale_x_continuous(breaks = seq(1,60,1))+
+  
+  geom_vline(xintercept=12,  
+             col='blue',      
+             size=0.3) +
+  geom_vline(xintercept=24,
+             col='blue',
+             size=0.3) +
+  geom_vline(xintercept=36,
+             col='blue',
+             size=0.3) +
+  geom_vline(xintercept =48,
+             col='blue',
+             size=0.3)+
+  geom_vline(xintercept =60,
+             col='blue',
+             size=0.3)+
+  
+  
+  
+
+  annotate("text", x = 12, y = 82, label = '2010', col = 'blue') +
+  annotate("text", x = 24, y = 82, label = '2011', col = 'blue') +
+  annotate("text", x = 36, y = 82, label = '2012', col = 'blue') +
+  annotate("text", x = 48, y = 82, label = '2013', col = 'blue')+
+  annotate("text", x = 60, y = 82, label = '2014', col = 'blue')
+  
+  theme(legend.text = element_text(size = 6), 
+        legend.title = element_text(size = 9))
+
+
+
+plot_sales<-ggplot(data= new_dati, aes(x = time, y = sales, color = city))+
+
+  geom_line() +
+  labs(title = "Andamento delle vendite",
+       x = "Mese (da 1 a 60)",
+       y = "vendite",
+       color = "Città")+
+
+  scale_x_continuous(breaks = seq(1,60,1))+
+  
+  geom_vline(xintercept=12,  
+             col='blue',      
+             size=0.3) +
+  geom_vline(xintercept=24,
+             col='blue',
+             size=0.3) +
+  geom_vline(xintercept=36,
+             col='blue',
+             size=0.3) +
+  geom_vline(xintercept =48,
+             col='blue',
+             size=0.3)+
+  geom_vline(xintercept =60,
+             col='blue',
+             size=0.3)+
+  
+  
+  
+
+  annotate("text", x = 12, y = 425, label = '2010', col = 'blue') +
+  annotate("text", x = 24, y = 425, label = '2011', col = 'blue') +
+  annotate("text", x = 36, y = 425, label = '2012', col = 'blue') +
+  annotate("text", x = 48, y = 425, label = '2013', col = 'blue')+
+  annotate("text", x = 60, y = 425, label = '2014', col = 'blue')
+  
+  theme(legend.text = element_text(size = 6), 
+        legend.title = element_text(size = 9))
+
+
+
+
+
+interactive_plot_conversation_rate<- ggplotly(plot_conversion_rate)%>%
+  layout(title = "Andamento dell'indice",
+         xaxis = list(title = "Mese (da 1 a 60)"),
+         yaxis = list(title = "Indice di conversione"))
+
+
+interactive_plot_volume<- ggplotly(plot_volume)%>%
+  layout(title = "Andamento volume di soldi",
+         xaxis = list(title = "Mese (da 1 a 60)"),
+         yaxis = list(title = "Soldi in mil"))
+
+interactive_plot_sales<- ggplotly(plot_sales)%>%
+  layout(title = "Andamento vendite",
+         xaxis = list(title = "Mese (da 1 a 60)"),
+         yaxis = list(title = "vendite"))
+  
+```
+
+### Line chart dell'indice di conversione per cittá e anno
+
+```{r}
+interactive_plot_conversation_rate
+```
+
+### Line chart andamento volume dei soldi per cittá ed anno
+
+```{r}
+interactive_plot_volume
+```
+
+### Line chart andamento delle vendite per cittá ed anno
+
+```{r}
+interactive_plot_sales
+```
+
+## CONCLUSIONI.
+
+Possiamo definire il mercato di Bryan_Collage il mercato immobiliare piú Frizzante rispetto agli altri, osservando la line chart dell'indice di conversione lungo tutto i mesi possiamo notare come nel periodo primaverile/estivo la conversione degli annunci in vendite sia molto elevata. Questo fatto é legato molto probabilmente, oltre che da efficaci strategie di vendite e marketing, anche dalla zona di interesse: effettuando una ricerca online emerge che il Bryant Collage Station é una cittá studentesca e universitaria, l'indice di vendita inizia ad aumentare ad inizio primavera colmando nel periodo estivo, che coincide con l'inizio delle lezioni e la chiusura delle iscrizioni. Non ho effettuato altre ricerche ma possiamo supporre che questo indice di conversione particolarmente alto possa anche essere dovuto a un aumento dell'attivitá studentesca nel corso degli ultimi anni e al numero degli abitanti che si attestano circa a 215,000 persone.
+
+La variazione del CV del prezzo mediano in Bryan_Collage é aumentata nel corso degli anni tuttavia non in maniera significativa, questo ci dice che la variabilitá del valore medio delle case non é particolarmente alta, probabilmente il valore degli immobili nell'area é abbastanza omogeneo.
+
+Tyler invece é un mercato diverso ha un pool di persone notevolmente ridotto rispetto a Bryant-collage contandone all'incirca 106,000. Possiamo notare come seppur l'indice di conversione sia notevolmente piú basso rispetto al Bryant-College, questo mercato faccia registrare un trend delle vendite e un trend di profitti in aumento nel corso degli ultimi anni. Possiamo notare come l'indice di conversione in questa cittá sia particolarmente basso, quindi potrebbe essere una buona idea quella di suggerire eventuali azioni di marketing finalizzate ad ottimizzare l'indice di conversione per aumentare le vendite e quindi ulterirormente i profitti.
+
+Per quanto riguarda le altre due cittá possiamo affermare che Beaumont segua gli stessi trend delle cittá sopra descritte seppur in maniera piú lieve. Wichita Falls se pur avendo un buon indice di conversione tuttavia fa registrare vendite e volume di soldi inferiori, per questa cittá potrebbe essere una buona idea aumentare invece gli annunci visto che tra le cittá é quella che ha fatto registrare i livelli piú bassi di listings; cosi facendo si potrebbero aumentare le vendite aumentando cosi anche il volume dei profitti.
+
+Le line chart, fanno emergere che i movimenti maggiori del mercato immobiliare si registrano principalmente nei periodi a cavallo tra inizio primavera e periodo estivo per poi scendere progressivamente in autunno facendo registrare i picchi negativi nella stagione invernale, grazie a questa informazione é possibile capire in quali periodi conviene intervenire per massimizzare vendite e profitti con azioni di marketing.
